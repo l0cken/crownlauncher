@@ -1,16 +1,3 @@
 {
-  "announcements": [
-    {
-      "id": "cda8f192de",
-      "title": "Witaj w CrownLauncher",
-      "text": "Jeżeli to widzisz to polecam ci wbić na KORONAMC.PL :))))",
-      "image": "",
-      "link": "",
-      "level": "info",
-      "pinned": true,
-      "expiresAt": "2026-10-19T18:17:38.105Z",
-      "author": "l0cken",
-      "createdAt": "2026-10-12T18:17:38.105Z"
-    }
-  ]
+  "announcements": []
 }
