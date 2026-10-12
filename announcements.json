@@ -1,3 +1,16 @@
 {
-  "announcements": []
+  "announcements": [
+    {
+      "id": "0fc67d142f",
+      "title": "Witaj Użytkowniku",
+      "text": "Leżeli widzisz to ogłoszenie to znaczy, że jesteś GOAT'em który używa najlepszego launchera i wbijaj na KORONAMC.PL :)",
+      "image": "",
+      "link": "",
+      "level": "info",
+      "pinned": true,
+      "expiresAt": "2026-10-19T19:19:41.185Z",
+      "author": "l0cken",
+      "createdAt": "2026-10-12T19:19:41.185Z"
+    }
+  ]
 }
