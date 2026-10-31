@@ -1,0 +1,13 @@
+{
+  "name": "crownlauncher-cloudflare",
+  "version": "0.0.1",
+  "private": true,
+  "description": "CrownLauncher: back-end na Cloudflare (Worker + Durable Object + R2). Plan: przekazanie.md §21.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.152.0"
+  }
+}

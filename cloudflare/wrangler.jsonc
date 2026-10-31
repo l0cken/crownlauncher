@@ -1,0 +1,33 @@
+{
+  // Worker + Durable Object (SQLite, stan) + R2 (instalator/aktualizacje, pliki wydarzeń, peleryny). Plan: przekazanie.md §21.
+  // Najwyższy poziom = ŚRODOWISKO TESTOWE (crownlauncher-test, bucket crownlauncher-test, https://2pfcni8n54rncwgc.locken.pl).
+  // env.production = docelowe (Worker crownlauncher, bucket crownlauncher) - wdrażać dopiero na próbę generalną i przełączenie (CUTOVER.md).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "crownlauncher-test",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [{ "pattern": "2pfcni8n54rncwgc.locken.pl", "custom_domain": true }],
+  "build": { "command": "node scripts/build-assets.js" },
+  "vars": { "INVITE_ONLY": "1" },
+  "durable_objects": { "bindings": [{ "name": "STATE", "class_name": "CrownState" }] },
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "crownlauncher-test" }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CrownState"] }],
+  "observability": { "enabled": false },
+
+  // PRODUKCJA (Worker `crownlauncher`, bucket R2 `crownlauncher`). Dopóki trwa próba generalna, trasa to LOSOWY host pomocniczy;
+  // przełączenie = dopisanie { "pattern": "launcher.locken.pl", "custom_domain": true } i `wrangler deploy --env production` (patrz CUTOVER.md).
+  "env": {
+    "production": {
+      "name": "crownlauncher",
+      "workers_dev": false,
+      "routes": [{ "pattern": "j2am6q00q6h5fe99.locken.pl", "custom_domain": true }, { "pattern": "launcher.locken.pl", "custom_domain": true }],
+      "vars": { "INVITE_ONLY": "1" },
+      "durable_objects": { "bindings": [{ "name": "STATE", "class_name": "CrownState" }] },
+      "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "crownlauncher" }],
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CrownState"] }],
+      "observability": { "enabled": false }
+    }
+  }
+}

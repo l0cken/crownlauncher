@@ -1,0 +1,28 @@
+{
+  "name": "crownlauncher",
+  "productName": "CrownLauncher",
+  "version": "0.1.41",
+  "description": "CrownLauncher - launcher Minecrafta z integracją z Modrinth",
+  "main": "src/main/main.js",
+  "desktopName": "crownlauncher.desktop",
+  "author": "CrownLauncher",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "server": "node server/server.js",
+    "dist": "electron-builder --config electron-builder.config.js --win nsis",
+    "release": "node scripts/release.js",
+    "panel": "node scripts/panel.js",
+    "gate": "node scripts/gate.js",
+    "dist:linux": "electron-builder --config electron-builder.config.js --linux AppImage"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.1",
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
+  }
+}
