@@ -47,7 +47,7 @@ async function serve() {
     await sleep(500);
   }
   // dokumenty wstawione do DATA_DIR przed startem (np. test migracji dawnego formatu) przenosimy do Workera
-  for (const name of ['invites.json', 'keys.json', 'players.json', 'announcements.json', 'blocklist.json']) {
+  for (const name of ['invites.json', 'keys.json', 'players.json', 'announcements.json']) {
     const file = path.join(DATA_DIR, name);
     if (!fs.existsSync(file)) continue;
     let value;

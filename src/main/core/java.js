@@ -13,13 +13,13 @@ function platformKey() {
     return { x64: 'windows-x64', arm64: 'windows-arm64', ia32: 'windows-x86' }[arch] || 'windows-x64';
   }
   if (process.platform === 'darwin') return arch === 'arm64' ? 'mac-os-arm64' : 'mac-os';
-  return arch === 'ia32' ? 'linux-i386' : 'linux';
+  throw new Error('CrownLauncher działa tylko w Windowsie.');
 }
 
 function javaRelPath() {
   if (process.platform === 'win32') return path.join('bin', 'java.exe');
   if (process.platform === 'darwin') return path.join('jre.bundle', 'Contents', 'Home', 'bin', 'java');
-  return path.join('bin', 'java');
+  throw new Error('CrownLauncher działa tylko w Windowsie.');
 }
 
 const inflight = new Map();
@@ -47,7 +47,6 @@ async function install(component, onProgress) {
   let entry = index[platformKey()]?.[component]?.[0];
   if (!entry && platformKey() === 'windows-arm64') entry = index['windows-x64']?.[component]?.[0];
   if (!entry) {
-    // np. Linux na ARM: Mojang buduje runtime tylko dla x64/x86 - wtedy działa Java zainstalowana w systemie
     throw new Error(
       `Mojang nie udostępnia runtime'u ${component} dla tej platformy (${platformKey()}). Zainstaluj Javę w systemie (JDK 21 albo nowszy; dla Minecrafta 26.x JDK 25) i wskaż ją w Ustawieniach → „Własna Java”.`,
     );
@@ -73,19 +72,6 @@ async function install(component, onProgress) {
     if (f.executable && process.platform !== 'win32') await fsp.chmod(dest, 0o755);
     onProgress({ stage: 'Java', current: ++done, total: downloads.length });
   });
-
-  // Linux/macOS: manifest runtime'u ma też dowiązania symboliczne (np. katalogi w legal/, biblioteki z numerem wersji w nazwie).
-  // Cel dowiązania musi wskazywać na plik w tym samym runtime - inaczej wpis jest pomijany.
-  if (process.platform !== 'win32') {
-    for (const [rel, f] of files) {
-      if (f.type !== 'link' || typeof f.target !== 'string') continue;
-      const link = path.join(dir, rel);
-      if (!isInside(dir, link) || !isInside(dir, path.resolve(path.dirname(link), f.target))) continue;
-      await fsp.mkdir(path.dirname(link), { recursive: true });
-      await fsp.rm(link, { force: true });
-      await fsp.symlink(f.target, link);
-    }
-  }
 
   await fsp.writeFile(marker, entry.version?.name || 'ok', 'utf8');
   return exe;

@@ -100,42 +100,6 @@ const freePort = () => new Promise((res) => { const s = net.createServer().liste
     fs.rmSync(keyFile);
   }
 
-  // 3b. wydanie dla Linuksa: AppImage + latest-linux.yml zbudowane gdzie indziej (--skip-build); ta sama wersja, bez podbijania
-  //     i bez oznaczania wersji jako „zajętej”; bez --skip-build w Windowsie skrypt tłumaczy, co zrobić
-  const linuxOut = path.join(dir, 'out-linux');
-  fs.mkdirSync(linuxOut, { recursive: true });
-  const appImage = require('crypto').randomBytes(200 * 1024);
-  fs.writeFileSync(path.join(linuxOut, 'CrownLauncher-9.9.10.AppImage'), appImage);
-  fs.writeFileSync(path.join(linuxOut, 'latest-linux.yml'), `version: 9.9.10\nfiles:\n  - url: CrownLauncher-9.9.10.AppImage\n    sha512: x\n    size: ${appImage.length}\npath: CrownLauncher-9.9.10.AppImage\n`);
-  const lastBefore = fs.readFileSync(path.join(dir, 'scripts/.last-release.json'), 'utf8');
-  r = spawnSync(process.execPath, [path.join(dir, 'scripts/release.js'), '--dir', linuxOut, '--linux', '--skip-build'], {
-    cwd: dir,
-    encoding: 'utf8',
-    env: { ...process.env, PATH: `${fakeBin};${process.env.PATH}`, USERPROFILE: profile, CROWN_ADMIN_KEY: adminKey },
-  });
-  assert.strictEqual(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /CrownLauncher-9\.9\.10\.AppImage/);
-  res = await get('/updates/latest-linux.yml', { 'X-Crown-Invite': inviteKey });
-  assert.strictEqual(res.status, 200);
-  assert.match(await res.text(), /CrownLauncher-9\.9\.10\.AppImage/);
-  res = await get('/updates/CrownLauncher-9.9.10.AppImage', { 'X-Crown-Invite': inviteKey });
-  assert.ok(Buffer.from(await res.arrayBuffer()).equals(appImage), 'AppImage na serwerze = lokalny');
-  assert.strictEqual((await get('/updates/CrownLauncher-9.9.10.AppImage')).status, 401, 'AppImage tylko z zaproszeniem');
-  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version, '9.9.10', 'wersja bez zmian');
-  assert.strictEqual(fs.readFileSync(path.join(dir, 'scripts/.last-release.json'), 'utf8'), lastBefore, 'wydanie Linuksa nie rusza znacznika wydanej wersji');
-  res = await get('/updates/latest.yml', { 'X-Crown-Invite': inviteKey });
-  assert.match(await res.text(), /Setup-9\.9\.10\.exe/, 'latest.yml Windows nietknięty');
-  if (process.platform !== 'linux') {
-    r = spawnSync(process.execPath, [path.join(dir, 'scripts/release.js'), '--dir', linuxOut, '--linux'], {
-      cwd: dir,
-      encoding: 'utf8',
-      env: { ...process.env, PATH: `${fakeBin};${process.env.PATH}`, USERPROFILE: profile, CROWN_ADMIN_KEY: adminKey },
-    });
-    assert.strictEqual(r.status, 1);
-    assert.match(r.stderr, /AppImage buduje się na Linuksie/);
-  }
-  ok('--linux --skip-build: AppImage i latest-linux.yml na serwerze (za zaproszeniem), wersja i znacznik bez zmian, latest.yml Windows nietknięty; w Windowsie bez --skip-build: wskazówka');
-
   // 4. brak klucza, zły klucz, serwer bez https
   r = run({});
   assert.strictEqual(r.status, 1);

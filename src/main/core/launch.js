@@ -6,8 +6,6 @@ const paths = require('./paths');
 const { rulesAllow } = require('./mojang');
 const { splitArgs, redact } = require('./util');
 const appConfig = require('./app-config');
-const anticheat = require('./anticheat');
-const nativeSpawn = require('./native-spawn');
 
 /**
  * Własności systemowe dla CrownClient (korona przed nickiem): adres listy graczy z odznaką (listing katalogu
@@ -126,16 +124,13 @@ function buildCommand({ instance, account, prep, config, joinServer = '', extraJ
   const jvm = expand(prep.merged.arguments?.jvm, vars, features);
   const game = expand(prep.merged.arguments?.game, vars, features);
 
-  // argumenty od gracza: bez agentów, atach, classpath itp. (to jest droga do wstrzykiwania kodu)
-  const { args: userJvm, removed: removedJvm } = anticheat.sanitizeJvmArgs(
-    splitArgs([config.jvmArgs, instance.jvmArgs].filter(Boolean).join(' ')),
-  );
+  const userJvm = splitArgs([config.jvmArgs, instance.jvmArgs].filter(Boolean).join(' '));
   const javaMajor = Number(prep.merged?.javaVersion?.majorVersion) || 21;
   const tuning = config.optimizeJvm === false ? [] : tuningArgs({ memory, userJvm, javaMajor });
   const before = [
     `-Xmx${memory}M`,
     `-Xms${Math.min(1024, memory)}M`,
-    ...anticheat.HARDENING_FLAGS,
+    '-XX:+IgnoreUnrecognizedVMOptions', // nieznana opcja JVM (np. z nowszej Javy) nie przerywa startu
     ...extraJvm, // wbudowany komponent launchera (-Dfabric.addMods / -Dloader.addMods)
     ...badgeProperties(),
     ...tuning,
@@ -148,7 +143,7 @@ function buildCommand({ instance, account, prep, config, joinServer = '', extraJ
   const javaPath = instance.javaPath || config.javaPath || prep.javaExe;
   // prawdziwy token (konto Microsoft) - nie może trafić do linii poleceń procesu ani do logów
   const secrets = account.type === 'microsoft' && account.accessToken ? [account.accessToken] : [];
-  return { javaPath, args, cwd: gameDir, removedJvm, secrets, mainIndex: before.length };
+  return { javaPath, args, cwd: gameDir, secrets, mainIndex: before.length };
 }
 
 // ---- token poza linią poleceń ------------------------------------------------------------------------
@@ -259,24 +254,31 @@ async function scrubCrashFiles(gameDir, secrets, since = 0) {
   return fixed;
 }
 
+// Zmienne z sekretami użytkownika (tokeny CI i GitHuba, klucze API i chmur, hasła, agent SSH). Gra i jej mody dziedziczą
+// środowisko launchera, a Minecraft żadnej z nich nie potrzebuje - mod z internetu nie ma ich czytać.
+const SECRET_ENV_RE =
+  /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIALS?|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|AUTH)(?:_|$)|^(?:GH|GITHUB|GITLAB|NPM|AWS|AZURE|GOOGLE|ANTHROPIC|OPENAI|CLAUDE|DOCKER|KUBE)_/i;
+
+/** Środowisko gry: kopia środowiska launchera bez zmiennych, które wyglądają na sekrety. */
+function scrubEnv(env = process.env) {
+  const out = { ...env };
+  for (const key of Object.keys(out)) {
+    if (SECRET_ENV_RE.test(key)) delete out[key];
+  }
+  return out;
+}
+
 async function run(command, { onLine, onExit }) {
   await fsp.mkdir(command.cwd, { recursive: true });
   const hidden = await hideSecrets(command);
   const wipe = () => hidden?.wipe();
   const gameArgs = hidden ? hidden.args : command.args;
-  // bez JAVA_TOOL_OPTIONS i podobnych: przez nie Java ładuje agenty bez wiedzy launchera;
-  // bez zmiennych z cudzymi sekretami (tokeny, klucze API) - mody gry nie mają ich czytać
-  const gameEnv = anticheat.scrubEnv(process.env);
-  // Windows: proces gry od urodzenia z blokadą wstrzykiwania kodu (native-spawn.js); gdy się nie da - zwykły start
-  // (game.js zakłada wtedy blokadę zaraz po starcie)
-  const child =
-    (await nativeSpawn.start({ file: command.javaPath, args: gameArgs, cwd: command.cwd, env: gameEnv }).catch(() => null)) ||
-    spawn(command.javaPath, gameArgs, {
-      cwd: command.cwd,
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: gameEnv,
-    });
+  const child = spawn(command.javaPath, gameArgs, {
+    cwd: command.cwd,
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: scrubEnv(process.env), // bez zmiennych z cudzymi sekretami (tokeny, klucze API) - mody gry nie mają ich czytać
+  });
 
   const feed = (buf) => {
     wipe(); // pierwsze wyjście = JVM przeczytała już plik argumentów
@@ -298,4 +300,4 @@ async function run(command, { onLine, onExit }) {
   return child;
 }
 
-module.exports = { buildCommand, run, splitSecretArgs, scrubCrashFiles, badgeProperties, LAUNCHER_NAME, LAUNCHER_VERSION };
+module.exports = { buildCommand, run, splitSecretArgs, scrubCrashFiles, scrubEnv, badgeProperties, LAUNCHER_NAME, LAUNCHER_VERSION };

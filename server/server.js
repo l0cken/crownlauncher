@@ -29,7 +29,6 @@
  *   GET  /  albo /download           strona z polem na klucz; POST /download oddaje najnowszy instalator
  *   GET  /updates/<plik>             wymaga zaproszenia (nagłówek X-Crown-Invite) albo klucza admin
  *   GET  /v1/invite                  sprawdza klucz zaproszenia -> { ok, name }
- *   GET  /blocklist.json             lista blokad antycheata (plik DATA_DIR/blocklist.json)
  *   GET  /admin                      panel administratora (klucze zaproszeń: utwórz, unieważnij, zwolnij komputer)
  *   Klucz zaproszenia wiąże się z pierwszym komputerem (nagłówek X-Crown-Device); REQUIRE_DEVICE=1 odrzuca
  *   launchery bez tego nagłówka. CLI: create-invite, list-invites, revoke-invite <id>, release-invite <id>.
@@ -825,17 +824,14 @@ function publicView(a, key) {
 // ---- aktualizacje launchera (electron-updater, provider "generic") ----------------------
 
 const UPDATES_DIR = path.join(DATA_DIR, 'updates');
-const UPDATE_FILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(exe|AppImage|blockmap|yml)$/;
+const UPDATE_FILE_RE = /^(?:[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(?:exe|blockmap)|latest\.yml)$/;
 const MAX_UPDATE_BYTES = 400 * 1024 * 1024;
-// wersje launchera do pobrania: plik wskazany w latest.yml (Windows, instalator .exe) albo latest-linux.yml (Linux, AppImage)
-const INSTALLER_KINDS = { windows: { yml: 'latest.yml', ext: '.exe' }, linux: { yml: 'latest-linux.yml', ext: '.AppImage' } };
 
-/** Nazwa najnowszego instalatora (Windows: .exe z latest.yml; `kind: 'linux'`: .AppImage z latest-linux.yml), albo '' gdy nic nie wgrano. */
-function latestInstaller(kind = 'windows') {
-  const { yml: ymlName, ext } = INSTALLER_KINDS[kind] || INSTALLER_KINDS.windows;
+/** Nazwa najnowszego instalatora (.exe wskazany w latest.yml) albo '' gdy nic nie wgrano. */
+function latestInstaller() {
   let yml = '';
   try {
-    yml = fs.readFileSync(path.join(UPDATES_DIR, ymlName), 'utf8');
+    yml = fs.readFileSync(path.join(UPDATES_DIR, 'latest.yml'), 'utf8');
   } catch {
     return '';
   }
@@ -845,7 +841,7 @@ function latestInstaller(kind = 'windows') {
   ];
   for (const c of candidates) {
     const name = String(c || '').trim().replace(/^['"]|['"]$/g, '');
-    if (UPDATE_FILE_RE.test(name) && name.endsWith(ext) && fs.existsSync(path.join(UPDATES_DIR, name))) return name;
+    if (UPDATE_FILE_RE.test(name) && name.endsWith('.exe') && fs.existsSync(path.join(UPDATES_DIR, name))) return name;
   }
   return '';
 }
@@ -1315,7 +1311,7 @@ async function handleAdmin(req, res, route, ip) {
     return send(res, 200, { ok: true }, { headers: { 'Set-Cookie': 'crown_panel=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' } });
   }
   if (route === 'GET /v1/admin/info') {
-    return send(res, 200, { installer: latestInstaller() || null, linuxInstaller: latestInstaller('linux') || null, inviteOnly: INVITE_ONLY, name: admin.name });
+    return send(res, 200, { installer: latestInstaller() || null, inviteOnly: INVITE_ONLY, name: admin.name });
   }
   if (route === 'GET /v1/admin/invites') {
     const list = loadInvites().map(publicInvite).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -1567,20 +1563,6 @@ async function handle(req, res) {
     const installer = latestInstaller();
     if (!installer) return sendHtml(res, 404, downloadPage('Instalator nie został jeszcze opublikowany.'));
     return serveUpdate(req, res, installer, { attachment: true });
-  }
-
-  // lista blokad antycheata (zamiast blocklist.json z GitHuba): plik DATA_DIR/blocklist.json, edytowany na serwerze
-  if (route === 'GET /blocklist.json') {
-    if (!invited(req)) return denyInvite(res, ip, req);
-    const text = (() => {
-      try {
-        return fs.readFileSync(path.join(DATA_DIR, 'blocklist.json'), 'utf8');
-      } catch {
-        return '{}';
-      }
-    })();
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
-    return res.end(text);
   }
 
   // peleryny i lista graczy z koroną są publiczne (czyta je gra, bez klucza); limit na adres IP

@@ -4,9 +4,6 @@ const appConfig = require('./src/main/core/app-config');
 
 const trim = (s) => String(s || '').trim().replace(/\/+$/, '');
 
-// build na Linuksa: `electron-builder --linux …` albo CROWN_TARGET=linux (patrz `npm run dist:linux`)
-const isLinuxBuild = process.env.CROWN_TARGET === 'linux' || process.argv.includes('--linux');
-
 function publishConfig() {
   // CROWN_PUBLISH_REPO: wydanie przejściowe na GitHuba z launcherem skierowanym już na własny serwer
   // (scripts/release.js --github właściciel/repo); zwykle puste, wtedy GITHUB_REPO z app-config.js
@@ -39,7 +36,6 @@ module.exports = {
       }
     : {}),
   files: ['src/**/*', 'assets/**/*', 'package.json'],
-  // Linux (AppImage) buduje `npm run dist:linux` - na Linuksie albo w WSL/Dockerze/CI (electron-builder nie składa AppImage w Windowsie)
   // Bezpieczniki Electrona (przestawiane w CrownLauncher.exe przy budowaniu):
   //  - runAsNode / NODE_OPTIONS / --inspect: nie da się uruchomić exe jako zwykłego Node'a ani podłączyć debuggera do
   //    procesu głównego (przez to wołanie modułów launchera i odszyfrowywanie jego danych z zewnątrz),
@@ -50,24 +46,11 @@ module.exports = {
     enableNodeOptionsEnvironmentVariable: false,
     enableNodeCliInspectArguments: false,
     onlyLoadAppFromAsar: true,
-    // Sprawdzanie sumy asara jest wbudowane w plik wykonywalny tylko w Windows i macOS (electron-builder zapisuje tam dane
-    // integralności); w buildzie Linuksa wyłączone, żeby aplikacja nie odmawiała startu z powodu braku tych danych.
-    enableEmbeddedAsarIntegrityValidation: !isLinuxBuild,
+    enableEmbeddedAsarIntegrityValidation: true,
   },
   win: {
     icon: 'assets/icon.ico',
     target: 'nsis',
-  },
-  linux: {
-    icon: 'assets/logo-512.png',
-    category: 'Game',
-    synopsis: 'Launcher Minecrafta (Fabric)',
-    executableName: 'crownlauncher',
-    // app_id / WM_CLASS okna = nazwa wpisu .desktop (inaczej Wayland i paski zadań nie wiążą okna z ikoną launchera)
-    syncDesktopName: true,
-    target: [{ target: 'AppImage', arch: ['x64'] }],
-    // plik wydania i latest-linux.yml; nazwa bez spacji - proste adresy URL jak przy instalatorze Windows
-    artifactName: 'CrownLauncher-${version}.${ext}',
   },
   nsis: {
     oneClick: false,

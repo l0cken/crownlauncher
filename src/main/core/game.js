@@ -6,8 +6,6 @@ const servers = require('./servers');
 const pinnedServers = require('./pinned-servers');
 const bundledMods = require('./bundled-mods');
 const discord = require('./discord');
-const anticheat = require('./anticheat');
-const nativeSpawn = require('./native-spawn');
 const performanceMods = require('./performance-mods');
 const modCheck = require('./mod-check');
 const crashAnalyzer = require('./crash-analyzer');
@@ -65,7 +63,6 @@ let emit = () => {};
 
 function init(emitFn) {
   emit = emitFn;
-  nativeSpawn.prepare(); // pomocnik natywnego startu gry kompiluje się w tle (raz), żeby pierwsza gra nie czekała
 }
 
 function setState(id, state) {
@@ -142,7 +139,6 @@ async function launch(id, { server = '' } = {}) {
   let dupes = [];
   let eventInstance = false; // instancja wydarzenia: foldery są zamknięte poza grą (event.js: seal / protectRunning)
   let account; // konto, na którym startuje gra (jego nick zgłaszamy bramce serwera, patrz gate.js)
-  let nativesDir = ''; // natywne biblioteki instancji (LWJGL…): jedyny folder użytkownika, z którego nadzór bibliotek nie podejrzewa nowych plików
   try {
     await invite.assertAllowed(); // prywatna dystrybucja: bez ważnego klucza zaproszenia gra nie startuje
     const target = await currentInstance(id);
@@ -151,12 +147,9 @@ async function launch(id, { server = '' } = {}) {
       eventInstance = true;
       await eventCore.beforeLaunch(target); // zdejmuje blokadę folderów - zakładamy ją z powrotem przy zamknięciu gry
     }
-    // cheaty: zanim cokolwiek pobierzemy, sprawdzamy mody instancji
-    await anticheat.assertInstanceClean(id);
     account = await auth.getLaunchAccount();
     const ready = await ensureInstalled(id);
     instance = ready.instance;
-    nativesDir = ready.prep?.nativesDir || '';
     // wbudowane mody launchera (CrownClient): ładowane z katalogu launchera, nie z folderu mods
     // wydarzenie może wyłączyć wbudowanego CrownClienta (noCrownClient) - wtedy grają wyłącznie pliki z serwera
     if (!instance.noCrownClient) await bundledMods.ensureBundledMods(instance);
@@ -208,12 +201,10 @@ async function launch(id, { server = '' } = {}) {
 
   const startedAt = Date.now();
   let exited = false;
-  let watch = null;
   const onExit = async (code) => {
     if (exited) return;
     exited = true;
     gate.end(id); // koniec gry = koniec sesji na bramce serwera
-    watch?.stop();
     onLine.end();
     flush();
     const userStopped = Boolean(running.get(id)?.stopping); // „Zatrzymaj” / zamknięcie launchera to nie awaria
@@ -287,9 +278,6 @@ async function launch(id, { server = '' } = {}) {
   if (cosmetics.applied) {
     onLine(`[CrownLauncher] Peleryny: ${cosmetics.cape ? 'własna peleryna' : 'wspólne peleryny graczy'} (CustomSkinLoader; skin bez zmian)`);
   }
-  if (command.removedJvm?.length) {
-    onLine(`[CrownLauncher] Usunięto niedozwolone argumenty JVM: ${command.removedJvm.join(' ')}`);
-  }
   // wydarzenie: w trakcie gry mods i resourcepacks tylko do odczytu (nikt nie podmieni paczki w locie)
   if (eventInstance) await eventCore.protectRunning(id).catch(() => {});
   // bramka serwera gry („na serwer tylko z launchera”): sesja zgłoszona, zanim gra zdąży połączyć się z serwerem; odnawiana co
@@ -308,52 +296,6 @@ async function launch(id, { server = '' } = {}) {
   }
   running.set(id, { child, startedAt });
 
-  // blokada wstrzykiwania: żaden program (cheat, nakładka, debugger) nie dostaje prawa do zapisu pamięci ani tworzenia wątków
-  // w procesie gry. Natywny start (native-spawn.js) zakłada ją w CreateProcess - od pierwszej chwili, razem z blokadą haków
-  // systemowych; gdy pomocnika nie ma, zakładamy ją zaraz po starcie. Nie blokuje gry, a wynik trafia do konsoli.
-  if (child.crownGuard) {
-    onLine(
-      `[CrownLauncher] ANTYCHEAT: proces gry uruchomiony od razu zamknięty na wstrzykiwanie kodu${child.crownExt ? ' (także hakami systemowymi)' : ''}.`,
-    );
-  } else if (process.platform === 'linux') {
-    // Linux nie ma DACL procesu: dostępu do gry pilnuje jądro (Yama), a nadzór bibliotek czyta /proc/<pid>/maps
-    anticheat
-      .linuxPtraceNote()
-      .then((note) => {
-        if (note && !exited) onLine(`[CrownLauncher] ${note}`);
-      })
-      .catch(() => {});
-  } else {
-    anticheat
-      .hardenProcess(child.pid)
-      .then((res) => {
-        if (res.skipped || exited) return;
-        if (res.ok) onLine('[CrownLauncher] ANTYCHEAT: proces gry zabezpieczony przed wstrzykiwaniem kodu.');
-        else onLine(`[CrownLauncher] Uwaga: nie udało się zabezpieczyć procesu gry przed wstrzykiwaniem kodu (${res.message}).`);
-      })
-      .catch(() => {});
-  }
-
-  // nadzór: biblioteki wstrzyknięte do procesu gry (DLL) - niepodpisana obca biblioteka kończy grę
-  watch = anticheat.watchProcess({
-    pid: child.pid,
-    javaPath: command.javaPath,
-    trustedDirs: nativesDir ? [nativesDir] : [],
-    // natywny start: biblioteki dostarcza pomocnik (bez uruchamiania PowerShella), więc można sprawdzać co pół sekundy
-    ...(child.getModules ? { getModules: child.getModules, getNames: child.getNames, fastMs: 500 } : {}),
-    onViolation: ({ kill, warn }) => {
-      const names = (list) => list.map((m) => path.basename(m)).join(', ');
-      if (kill.length) {
-        onLine(`[CrownLauncher] ANTYCHEAT: wykryto wstrzyknięte biblioteki (${names(kill)}) - zamykam grę.`);
-        emit('anticheat:alert', { id, message: `Wykryto wstrzyknięty kod (${names(kill)}). Gra została zamknięta.`, fatal: true });
-        if (running.get(id)) running.get(id).stopping = true; // to nie awaria renderera
-        child.kill();
-      } else {
-        onLine(`[CrownLauncher] ANTYCHEAT: nieznana biblioteka w procesie gry (${names(warn)}).`);
-        emit('anticheat:alert', { id, message: `Nieznana biblioteka w grze: ${names(warn)}.`, fatal: false });
-      }
-    },
-  });
   if (config.get().discordPresence) discord.start({ instance, server, startedAt });
   await instances.update(id, { lastPlayed: startedAt });
   config.set({ lastInstance: id });

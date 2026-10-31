@@ -57,7 +57,7 @@ async function getVanillaJson(id) {
 // ---- reguły (rules) ----------------------------------------------------
 
 function osName() {
-  return { win32: 'windows', darwin: 'osx', linux: 'linux' }[process.platform] || process.platform;
+  return { win32: 'windows', darwin: 'osx' }[process.platform] || process.platform;
 }
 
 function osArch() {

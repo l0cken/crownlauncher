@@ -18,7 +18,6 @@ const TOKEN = `eyJhbGciOiJIUzI1NiJ9.${'a'.repeat(40)}.${'b'.repeat(43)}`;
   const config = require(root + 'src/main/core/config.js');
   const auth = require(root + 'src/main/core/auth.js');
   const util = require(root + 'src/main/core/util.js');
-  const anticheat = require(root + 'src/main/core/anticheat.js');
   const launch = require(root + 'src/main/core/launch.js');
   const announcements = require(root + 'src/main/core/announcements.js');
 
@@ -71,29 +70,19 @@ const TOKEN = `eyJhbGciOiJIUzI1NiJ9.${'a'.repeat(40)}.${'b'.repeat(43)}`;
   ok('redact: token i dowolny JWT znikają z linii logów');
 
   // ---- środowisko procesu gry ----
-  const env = anticheat.scrubEnv({
+  const env = launch.scrubEnv({
     PATH: 'C:\\x', JAVA_HOME: 'C:\\j', APPDATA: 'C:\\a', TEMP: 'C:\\t', LOCALAPPDATA: 'C:\\l', USERPROFILE: 'C:\\u', SystemRoot: 'C:\\w',
     ProgramFiles: 'C:\\p', NUMBER_OF_PROCESSORS: '8', MESA_GLSL_CACHE_DIR: 'x', __GL_THREADED_OPTIMIZATIONS: '1',
     GITHUB_TOKEN: 's', GH_TOKEN: 's', ANTHROPIC_API_KEY: 's', AWS_SECRET_ACCESS_KEY: 's', MY_PASSWORD: 's', SSH_AUTH_SOCK: 's',
-    NPM_TOKEN: 's', CROWN_GITHUB_TOKEN: 's', JAVA_TOOL_OPTIONS: '-javaagent:x.jar', DB_CREDENTIALS: 's',
+    NPM_TOKEN: 's', CROWN_GITHUB_TOKEN: 's', DB_CREDENTIALS: 's',
   });
   for (const k of ['PATH', 'JAVA_HOME', 'APPDATA', 'TEMP', 'LOCALAPPDATA', 'USERPROFILE', 'SystemRoot', 'ProgramFiles', 'NUMBER_OF_PROCESSORS', 'MESA_GLSL_CACHE_DIR', '__GL_THREADED_OPTIMIZATIONS']) {
     assert.ok(k in env, `zostaje ${k}`);
   }
-  for (const k of ['GITHUB_TOKEN', 'GH_TOKEN', 'ANTHROPIC_API_KEY', 'AWS_SECRET_ACCESS_KEY', 'MY_PASSWORD', 'SSH_AUTH_SOCK', 'NPM_TOKEN', 'CROWN_GITHUB_TOKEN', 'JAVA_TOOL_OPTIONS', 'DB_CREDENTIALS']) {
+  for (const k of ['GITHUB_TOKEN', 'GH_TOKEN', 'ANTHROPIC_API_KEY', 'AWS_SECRET_ACCESS_KEY', 'MY_PASSWORD', 'SSH_AUTH_SOCK', 'NPM_TOKEN', 'CROWN_GITHUB_TOKEN', 'DB_CREDENTIALS']) {
     assert.ok(!(k in env), `usunięte ${k}`);
   }
   ok('scrubEnv: sekrety użytkownika (tokeny, klucze, hasła, SSH) nie trafiają do procesu gry; PATH/JAVA_HOME/AppData zostają');
-
-  // ---- argumenty JVM ----
-  const { args, removed } = anticheat.sanitizeJvmArgs([
-    '-Xmx2G', '-XX:+UseZGC', '-Dcom.sun.management.jmxremote.port=9999', '-XX:+UsePerfData', '-XX:-PerfDisableSharedMem',
-    '-XX:+HeapDumpOnOutOfMemoryError', '-XX:HeapDumpPath=C:\\x', '-javaagent:x.jar',
-  ]);
-  assert.deepStrictEqual(args, ['-Xmx2G', '-XX:+UseZGC']);
-  assert.strictEqual(removed.length, 6);
-  assert.ok(anticheat.HARDENING_FLAGS.includes('-XX:-UsePerfData'));
-  ok('JVM: JMX, perf data i zrzuty sterty z argumentów gracza usuwane; -XX:-UsePerfData zawsze włączone');
 
   // ---- token poza linią poleceń (logika podziału) ----
   const MAIN = 'net.fabricmc.loader.impl.launch.knot.KnotClient';

@@ -4,7 +4,6 @@ const AdmZip = require('adm-zip');
 const paths = require('./paths');
 const mojang = require('./mojang');
 const instances = require('./instances');
-const anticheat = require('./anticheat');
 const modCheck = require('./mod-check');
 const { fetchJson, downloadFile, pool, isInside, hashFile, exists } = require('./util');
 
@@ -143,14 +142,6 @@ async function installVersion({ instance, version, type, meta, visited, installe
     sha1: file.hashes?.sha1,
     size: file.size,
   });
-  if (type === 'mod') {
-    // cheaty nie trafiają do instancji: plik jest usuwany, zanim cokolwiek go wczyta
-    const reasons = await anticheat.inspectFile(dest, await anticheat.loadRules());
-    if (reasons.length) {
-      await fsp.rm(dest, { force: true });
-      throw new Error(`„${meta.title || file.filename}” jest niedozwolony na tym launcherze (${reasons[0]}).`);
-    }
-  }
 
   const index = await instances.readIndex(instance.id);
   // usuń poprzednią wersję tego samego projektu
@@ -508,11 +499,6 @@ async function importMrpackFile(packFile, { fallbackName = 'Paczka modów' } = {
       await fsp.writeFile(dest, entry.getData());
     }
 
-    // paczka z cheatem nie powstaje: sprawdzamy mody (także te z overrides), zanim instancja zostanie zachowana
-    const findings = await anticheat.scanDir(instances.contentDir(instance.id, 'mod'), await anticheat.loadRules());
-    if (findings.length) {
-      throw new Error(`Ta paczka zawiera niedozwolone mody (cheaty):\n${anticheat.describe(findings)}`);
-    }
     // gotowa paczka ma własny, dobrany zestaw modów - nie dokładamy do niej niczego od siebie
     await instances.update(instance.id, { perfModsApplied: true });
   } catch (e) {

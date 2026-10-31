@@ -86,7 +86,7 @@ function register(ipcMain, { getWindow }) {
   const ensureGameClosed = (id, what) => {
     if (game.states()[id]) {
       throw new Error(
-        `Zamknij grę w tej instancji, zanim ${what}.${process.platform === 'win32' ? ' Dopóki gra działa, Windows blokuje pliki modów.' : ''}`,
+        `Zamknij grę w tej instancji, zanim ${what}. Dopóki gra działa, Windows blokuje pliki modów.`,
       );
     }
   };
@@ -103,7 +103,6 @@ function register(ipcMain, { getWindow }) {
     version: pkg.version,
     dataDir: paths.root(),
     platform: process.platform,
-    secretStore: auth.storageKind(), // dpapi | keychain | keyring | basic | none (Linux bez pęku kluczy: basic)
     minVersion: mojang.MIN_VERSION,
     maxVersion: mojang.MAX_VERSION,
   }));

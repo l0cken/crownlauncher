@@ -27,7 +27,7 @@ function friendlyError(err) {
   if (/\b401\b|Unauthorized/i.test(raw)) {
     return 'Serwer odrzucił klucz zaproszenia — wpisz go ponownie w Ustawieniach (Zaproszenie).';
   }
-  if (/latest(?:-linux)?\.yml|HttpError: 404|status code 404|\b404\b/i.test(raw)) {
+  if (/latest\.yml|HttpError: 404|status code 404|\b404\b/i.test(raw)) {
     return 'Nowa wersja jest właśnie publikowana — spróbuj ponownie za minutę lub dwie.';
   }
   if (/ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ERR_INTERNET_DISCONNECTED|ERR_NETWORK|ERR_CONNECTION|ERR_NAME_NOT_RESOLVED|net::/i.test(raw)) {
@@ -112,11 +112,6 @@ async function check() {
     return state;
   }
   if (state.state === 'downloading' || state.state === 'ready') return state;
-  // Linux: electron-updater podmienia plik AppImage; wersja rozpakowana z archiwum / z pakietu nie ma czego podmienić
-  if (process.platform === 'linux' && !process.env.APPIMAGE && !forceDev) {
-    setState({ state: 'disabled', reason: 'Automatyczne aktualizacje na Linuksie działają tylko w wersji AppImage. Pobierz nową wersję ze strony launchera.' });
-    return state;
-  }
 
   let source;
   try {

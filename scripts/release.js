@@ -20,11 +20,7 @@
  *      CROWN_ADMIN_KEY=crown_...  [CROWN_SERVER=https://...]  npm run release
  *      (buduje, wgrywa pliki na serwer; latest.yml na końcu)
  *
- *  Linux (AppImage, tylko tryb serwera): zbuduj na Linuksie/WSL/Docker/CI  `CROWN_OUT_DIR=release npm run dist:linux`,
- *      potem tu:  npm run release -- --linux --skip-build   (wgrywa AppImage i latest-linux.yml; wersja ta sama co w wydaniu Windows)
- *
  * Opcje:  --skip-build   użyj już zbudowanych plików (tylko tryb serwera)
- *         --linux        wydanie dla Linuksa zamiast Windows (patrz wyżej)
  *         --dir <katalog>   katalog wyjściowy (domyślnie release)
  *         --keep-version    nie podbijaj wersji automatycznie (tryb GitHub)
  *         --keep-old        nie usuwaj starszych wydań po publikacji (tryb GitHub)
@@ -65,26 +61,6 @@ function build(extraArgs = []) {
     env: { ...process.env, CROWN_OUT_DIR: outDir },
   });
   if (r.status !== 0) fail('Budowanie nie powiodło się.');
-}
-
-/** Linux (AppImage): electron-builder składa go tylko na Linuksie (też WSL, Docker, CI) - w Windowsie podpowiadamy, co zrobić. */
-function buildLinux() {
-  if (process.platform !== 'linux') {
-    fail(
-      'AppImage buduje się na Linuksie (WSL, Docker albo CI), nie w Windowsie. Tam uruchom:\n' +
-        '    CROWN_OUT_DIR=release npm run dist:linux\n' +
-        '  a potem tutaj, w folderze z gotowymi plikami (release/CrownLauncher-<wersja>.AppImage i latest-linux.yml):\n' +
-        '    npm run release -- --linux --skip-build',
-    );
-  }
-  console.log('→ Buduję AppImage…');
-  const r = spawnSync('npx', ['electron-builder', '--config', 'electron-builder.config.js', '--linux', 'AppImage'], {
-    cwd: root,
-    stdio: 'inherit',
-    shell: true,
-    env: { ...process.env, CROWN_OUT_DIR: outDir, CROWN_TARGET: 'linux' },
-  });
-  if (r.status !== 0) fail('Budowanie AppImage nie powiodło się.');
 }
 
 // ---- tryb GitHub ---------------------------------------------------------------------------
@@ -320,10 +296,7 @@ if (!/^https:\/\//.test(server) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(se
 // Wersja musi rosnąć - launcher aktualizuje się tylko do WYŻSZEJ. Gdy ta z package.json została już wydana tym
 // skryptem, numer patch rośnie sam (tak samo jak w trybie GitHub). Przy --skip-build budowa już istnieje, więc
 // numeru nie ruszamy.
-// --linux: wydanie dla Linuksa (AppImage + latest-linux.yml) - ta sama wersja co wydanie Windows (nie podbijamy numeru i nie oznaczamy
-// jej jako „zajętej”: robi to wydanie Windows), a build robi się na Linuksie.
-const linux = flag('--linux');
-if (!linux && !flag('--skip-build') && !flag('--keep-version')) {
+if (!flag('--skip-build') && !flag('--keep-version')) {
   const current = JSON.parse(fs.readFileSync(versions.pkgFile, 'utf8')).version;
   const last = versions.readLastReleased();
   if (last && versions.compareVersions(last, current) >= 0) {
@@ -333,12 +306,9 @@ if (!linux && !flag('--skip-build') && !flag('--keep-version')) {
   }
 }
 
-if (!flag('--skip-build')) {
-  if (linux) buildLinux();
-  else build();
-}
+if (!flag('--skip-build')) build();
 
-const latest = path.join(outDir, linux ? 'latest-linux.yml' : 'latest.yml');
+const latest = path.join(outDir, 'latest.yml');
 if (!fs.existsSync(latest)) fail(`Brak ${latest} - nie zbudowano aktualizacji.`);
 
 // pliki wymienione w latest.yml + ich .blockmap
@@ -349,7 +319,7 @@ for (const name of new Set(names)) {
   uploads.push(name);
   if (fs.existsSync(path.join(outDir, `${name}.blockmap`))) uploads.push(`${name}.blockmap`);
 }
-uploads.push(path.basename(latest)); // na końcu (latest.yml albo latest-linux.yml)
+uploads.push(path.basename(latest)); // latest.yml na końcu
 
 /** Jedno żądanie do serwera aktualizacji (klucz admin w nagłówku); `payload` to bufor albo strumień. Zwraca { status, body }. */
 function call(method, urlString, headers, payload) {
@@ -442,6 +412,6 @@ async function put(file) {
     console.log(`${(size / 1048576).toFixed(1)} MB ✓`);
   }
   const version = /^version:\s*(.+)$/m.exec(yml)?.[1]?.trim();
-  if (version && !releaseTarget && !linux) versions.markReleased(version); // wersja jest „zajęta”: następne wydanie podbije numer samo (nie dotyczy wgrania próbnego na cf-test)
+  if (version && !releaseTarget) versions.markReleased(version); // wersja jest „zajęta”: następne wydanie podbije numer samo (nie dotyczy wgrania próbnego na cf-test)
   console.log(`\n✓ Opublikowano aktualizację${version ? ` ${version}` : ''}. Launchery sprawdzą ją w ciągu kilku godzin lub po uruchomieniu.`);
 })().catch((e) => fail(e.message));

@@ -49,7 +49,7 @@ function parseLogLine(line, prev = 'INFO') {
   const sys = SYS_RE.exec(text);
   if (sys) {
     const body = sys[1];
-    const alert = /ANTYCHEAT|nie jest już obsługiwany|nie wystartował|awari|błąd/i.test(body);
+    const alert = /nie jest już obsługiwany|nie wystartował|awari|błąd/i.test(body);
     return {
       level: prev,
       sys: true,

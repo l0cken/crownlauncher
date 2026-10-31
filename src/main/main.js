@@ -34,8 +34,7 @@ function createWindow() {
     show: false,
     backgroundColor: '#0d0e12',
     title: 'CrownLauncher',
-    // Windows bierze ikonę z .ico; Linux (okno bez ramki w menedżerze okien) potrzebuje PNG
-    icon: path.join(__dirname, '../../assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    icon: path.join(__dirname, '../../assets', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -102,7 +101,6 @@ if (!gotLock) {
     if (HARDEN) Menu.setApplicationMenu(null); // domyślne menu Electrona ma m.in. „Przełącz narzędzia deweloperskie”
     // dawne sekrety zapisane jawnie (jeśli jakieś są) przepisujemy na zaszyfrowane
     try {
-      require('./core/auth').prepareStorage(); // Linux bez pęku kluczy: zapasowy magazyn Electrona
       require('./core/auth').migrateSecrets();
     } catch {
       /* migracja jest dodatkiem - nie blokuje startu */

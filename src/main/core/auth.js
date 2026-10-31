@@ -37,38 +37,6 @@ function seal(text) {
   return `raw:${Buffer.from(text, 'utf8').toString('base64')}`; // tylko poza Electronem (testy w samym Node)
 }
 
-/**
- * Linux bez menedżera haseł (gnome-libsecret, KWallet - np. goły i3/sway albo sesja bez keyringa): Electron nie ma wtedy czym
- * zaszyfrować tokenów i `isEncryptionAvailable()` zwraca false, więc launcher nie zapisałby klucza zaproszenia ani identyfikatora
- * komputera. `setUsePlainTextEncryption` każe użyć wtedy klucza wbudowanego w Electrona - to zaciemnienie, nie ochrona przed
- * programem tego samego użytkownika (DPAPI też jej nie daje), ale config.json nie zawiera czytelnych tokenów, gdy ktoś go wklei
- * w czacie albo skopiuje do chmury. Wołać po `app.whenReady()`, przed pierwszym szyfrowaniem. Poza Linuksem nic nie robi.
- * Zwraca rodzaj magazynu: 'dpapi' | 'keychain' | 'keyring' | 'basic' | 'none'.
- */
-function prepareStorage(platform = process.platform) {
-  const storage = safeStorage();
-  storageKindValue = 'none';
-  if (!storage) return storageKindValue;
-  try {
-    if (platform === 'win32') storageKindValue = storage.isEncryptionAvailable() ? 'dpapi' : 'none';
-    else if (platform === 'darwin') storageKindValue = storage.isEncryptionAvailable() ? 'keychain' : 'none';
-    else {
-      const backend = typeof storage.getSelectedStorageBackend === 'function' ? storage.getSelectedStorageBackend() : '';
-      if ((!storage.isEncryptionAvailable() || backend === 'basic_text') && typeof storage.setUsePlainTextEncryption === 'function') {
-        storage.setUsePlainTextEncryption(true);
-      }
-      if (storage.isEncryptionAvailable()) storageKindValue = backend === 'basic_text' || !backend ? 'basic' : 'keyring';
-    }
-  } catch {
-    storageKindValue = 'none';
-  }
-  return storageKindValue;
-}
-
-let storageKindValue = 'none';
-/** Rodzaj magazynu sekretów ustalony przez prepareStorage (do ekranu informacyjnego i diagnostyki). */
-const storageKind = () => storageKindValue;
-
 const SEALED = /^(?:enc|raw):/;
 const isSealed = (value) => typeof value === 'string' && SEALED.test(value);
 
@@ -473,6 +441,4 @@ module.exports = {
   unseal,
   isSealed,
   migrateSecrets,
-  prepareStorage,
-  storageKind,
 };

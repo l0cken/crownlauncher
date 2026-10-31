@@ -116,11 +116,6 @@ function atLeast(version, min) {
 /** Czy komputer ma sterownik Vulkana (biblioteka ładowana przez VulkanMod). */
 function vulkanAvailable() {
   try {
-    if (process.platform === 'linux') {
-      // loader Vulkana (libvulkan.so.1) z pakietu systemowego; sterownik (ICD) zgłasza się osobno w /usr/share/vulkan/icd.d
-      const dirs = ['/usr/lib/x86_64-linux-gnu', '/usr/lib64', '/usr/lib', '/lib/x86_64-linux-gnu', '/lib64', '/usr/lib/aarch64-linux-gnu', '/run/opengl-driver/lib'];
-      return dirs.some((d) => fs.existsSync(path.join(d, 'libvulkan.so.1')));
-    }
     if (process.platform !== 'win32') return false;
     return fs.existsSync(path.join(process.env.windir || 'C:\\Windows', 'System32', 'vulkan-1.dll'));
   } catch {

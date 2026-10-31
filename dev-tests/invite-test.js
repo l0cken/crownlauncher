@@ -54,7 +54,7 @@ async function startServer(extraEnv = {}) {
 
   // ---- bez klucza: nic prywatnego nie jest dostępne ----
   const get = (p, headers = {}) => fetch(`${base}${p}`, { headers });
-  for (const p of ['/updates/latest.yml', '/updates/CrownLauncher-Setup-9.9.9.exe', '/v1/announcements', '/blocklist.json', '/v1/invite']) {
+  for (const p of ['/updates/latest.yml', '/updates/CrownLauncher-Setup-9.9.9.exe', '/v1/announcements', '/v1/invite']) {
     assert.strictEqual((await get(p)).status, 401, `${p} bez klucza`);
   }
   assert.strictEqual((await fetch(`${base}/v1/presence`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"nick":"Anna"}' })).status, 401);
@@ -63,7 +63,7 @@ async function startServer(extraEnv = {}) {
   assert.strictEqual((await get('/capes/Anna.png')).status, 404, 'peleryny zostają publiczne (404 = brak pliku, nie brak dostępu)');
   assert.strictEqual((await get('/v1/crown-users')).status, 200, 'lista koron zostaje publiczna (czyta ją gra)');
   assert.strictEqual((await get('/health')).status, 200);
-  ok('bez zaproszenia: latest.yml, instalator, ogłoszenia, lista blokad, zapis peleryn → 401; peleryny i lista koron publiczne');
+  ok('bez zaproszenia: latest.yml, instalator, ogłoszenia, zapis peleryn → 401; peleryny i lista koron publiczne');
 
   // ---- z zaproszeniem ----
   const inv = (key) => ({ 'X-Crown-Invite': key });
@@ -79,9 +79,7 @@ async function startServer(extraEnv = {}) {
   assert.strictEqual((await r.json()).name, 'Anna');
   assert.strictEqual((await get('/v1/announcements', inv(bartekKey))).status, 200);
   assert.strictEqual((await get('/updates/latest.yml', { Authorization: `Bearer ${adminKey}` })).status, 200, 'klucz administracji też');
-  await backendDocs(dataDir, base).write('blocklist.json', { modIds: ['zlymod'] });
-  assert.deepStrictEqual(await (await get('/blocklist.json', inv(annaKey))).json(), { modIds: ['zlymod'] });
-  ok('z zaproszeniem: aktualizacje (też Range), ogłoszenia, lista blokad, /v1/invite → 200; klucz admin też przechodzi');
+  ok('z zaproszeniem: aktualizacje (też Range), ogłoszenia, /v1/invite → 200; klucz admin też przechodzi');
 
   // ---- strona pobierania ----
   r = await get('/');
@@ -99,41 +97,25 @@ async function startServer(extraEnv = {}) {
   assert.ok(Buffer.from(await r.arrayBuffer()).equals(exe), 'ten sam plik co wgrany');
   ok('strona pobierania: formularz; zły klucz 401; dobry klucz → instalator jako załącznik (klucz w POST, nie w adresie)');
 
-  // ---- wersja dla Linuksa (AppImage + latest-linux.yml) ----
-  // strona pokazuje jeden przycisk „Pobierz instalator” (przycisk Linuksa zdjęty ze strony); POST /download ignoruje pole os
+  // ---- tylko instalator Windows ----
+  // strona ma jeden przycisk „Pobierz instalator”; POST /download zawsze oddaje instalator .exe (obce pola formularza są ignorowane),
+  // a pliki innych systemów (AppImage, latest-linux.yml) nie są przyjmowane przez /v1/updates
   assert.strictEqual((page.match(/<button\b/g) || []).length, 1, 'strona ma jeden przycisk pobierania');
   assert.match(page, /<button type="submit" id="go">Pobierz instalator<\/button>/);
-  assert.ok(!/go-linux|Linuks|AppImage|value="linux"/i.test(page), 'strona nie ma przycisku ani tekstu o Linuksie');
-  const postOs = (key, os) => fetch(`${base}/download`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `key=${encodeURIComponent(key)}&os=${os}` });
-  const appImage = Buffer.alloc(200 * 1024, 9);
-  assert.strictEqual((await put('CrownLauncher-9.9.9.AppImage', appImage)).status, 201, 'plik .AppImage jest dozwolony');
-  assert.strictEqual((await put('latest-linux.yml', Buffer.from('version: 9.9.9\nfiles:\n  - url: CrownLauncher-9.9.9.AppImage\n    sha512: x\n    size: 204800\npath: CrownLauncher-9.9.9.AppImage\n'))).status, 201, 'latest-linux.yml jest dozwolony');
-  assert.strictEqual((await get('/updates/CrownLauncher-9.9.9.AppImage')).status, 401, 'AppImage bez klucza → 401');
-  assert.strictEqual((await get('/updates/latest-linux.yml')).status, 401, 'latest-linux.yml bez klucza → 401');
-  r = await get('/updates/latest-linux.yml', inv(annaKey));
+  assert.ok(!/Linux|Linuks|AppImage/i.test(page), 'strona nie wspomina o innych systemach');
+  r = await fetch(`${base}/download`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `key=${encodeURIComponent(annaKey)}&os=cokolwiek` });
   assert.strictEqual(r.status, 200);
-  assert.match(await r.text(), /CrownLauncher-9\.9\.9\.AppImage/, 'electron-updater na Linuksie czyta latest-linux.yml z kluczem');
-  r = await get('/updates/CrownLauncher-9.9.9.AppImage', { ...inv(annaKey), Range: 'bytes=0-99' });
-  assert.strictEqual(r.status, 206);
-  assert.strictEqual((await r.arrayBuffer()).byteLength, 100);
-  // strona pobierania oddaje tylko instalator Windows: pole os (dawny przycisk Linuksa) jest ignorowane, nawet gdy AppImage jest wgrany
-  for (const os of ['linux', 'windows']) {
-    r = await postOs(annaKey, os);
-    assert.strictEqual(r.status, 200);
-    assert.match(r.headers.get('content-disposition'), /attachment; filename="CrownLauncher-Setup-9\.9\.9\.exe"/, `os=${os} → instalator`);
-    assert.ok(Buffer.from(await r.arrayBuffer()).equals(exe), `os=${os}: ten sam plik co wgrany instalator`);
-  }
-  r = await post(annaKey);
-  assert.match(r.headers.get('content-disposition'), /CrownLauncher-Setup-9\.9\.9\.exe/, 'bez pola os → instalator');
-  await r.arrayBuffer();
-  assert.strictEqual((await postOs('CROWN-AAAA-AAAA-AAAA-AAAA', 'linux')).status, 401, 'zły klucz nie dostaje niczego');
+  assert.match(r.headers.get('content-disposition'), /attachment; filename="CrownLauncher-Setup-9\.9\.9\.exe"/, 'obce pole os jest ignorowane');
+  assert.ok(Buffer.from(await r.arrayBuffer()).equals(exe), 'ten sam plik co wgrany instalator');
+  assert.strictEqual((await put('CrownLauncher-9.9.9.AppImage', Buffer.alloc(1024, 9))).status, 400, 'plik .AppImage nie jest dozwolony');
+  assert.strictEqual((await put('latest-linux.yml', Buffer.from('version: 9.9.9\n'))).status, 400, 'latest-linux.yml nie jest dozwolony');
   r = await fetch(`${base}/v1/admin/info`, { headers: { Authorization: `Bearer ${adminKey}` } });
   if (r.status === 200) {
     const info = await r.json();
-    assert.strictEqual(info.linuxInstaller, 'CrownLauncher-9.9.9.AppImage');
     assert.strictEqual(info.installer, 'CrownLauncher-Setup-9.9.9.exe');
+    assert.ok(!('linuxInstaller' in info), 'panel nie zna instalatora dla innych systemów');
   }
-  ok('Linux: AppImage i latest-linux.yml wgrywane i chronione kluczem; strona pobierania oddaje tylko instalator (os=linux ignorowane), AppImage idzie tylko aktualizacjami z kluczem');
+  ok('serwer obsługuje tylko instalator Windows: jeden przycisk na stronie, POST /download oddaje .exe, AppImage i latest-linux.yml są odrzucane (400)');
 
   // ---- unieważnienie jednego gracza ----
   assert.strictEqual((await get('/v1/invite', inv(bartekKey))).status, 200);
@@ -159,7 +141,6 @@ async function startServer(extraEnv = {}) {
   };
   const ola = mk('Ola');
   await fetch(`${srv2.base}/v1/updates/latest.yml`, { method: 'PUT', headers: { Authorization: `Bearer ${adminKey2}` }, body: 'version: 1.0.0\n' });
-  await backendDocs(srv2.dataDir, srv2.base).write('blocklist.json', { modIds: ['zlymod'] });
 
   const appConfig = require(root + 'src/main/core/app-config.js');
   Object.assign(appConfig, { GITHUB_REPO: '', ANNOUNCEMENTS_URL: srv2.base, UPDATE_URL: '', INVITE_REQUIRED: true, CAPES_URL: '' });
@@ -169,7 +150,6 @@ async function startServer(extraEnv = {}) {
   const auth = require(root + 'src/main/core/auth.js');
   const invite = require(root + 'src/main/core/invite.js');
   const announcements = require(root + 'src/main/core/announcements.js');
-  const anticheat = require(root + 'src/main/core/anticheat.js');
   const capes = require(root + 'src/main/core/capes.js');
 
   assert.strictEqual(invite.required(), true);
@@ -210,9 +190,7 @@ async function startServer(extraEnv = {}) {
   assert.ok(toOurs.length >= 1 && toOurs.every((q) => 'X-Crown-Invite' in q.headers), 'własny serwer dostaje');
   ok('klucz zaproszenia wysyłany tylko do serwera, dla którego go wpisano (podmiana adresu w ustawieniach go nie wydaje)');
 
-  // lista blokad z serwera (zamiast GitHuba) i peleryny z kluczem
-  const rules = await anticheat.loadRules({ force: true });
-  assert.ok(rules.ids.has('zlymod'), 'blocklist.json z serwera zaczytany');
+  // peleryny z kluczem
   auth.listPublic = () => ({ accounts: [{ id: 'a1', username: 'Ola', type: 'offline', uuid: 'u' }], selected: 'a1' });
   // peleryny są tylko dla kluczy z dostępem nadanym przez administratora (panel / set-capes)
   await assert.rejects(capes.select('builtin-gold'), /tylko dla wybranych graczy/);
@@ -221,7 +199,7 @@ async function startServer(extraEnv = {}) {
   const sel = await capes.select('builtin-gold');
   assert.strictEqual(sel.shared, true, JSON.stringify(sel));
   assert.strictEqual((await fetch(`${srv2.base}/capes/Ola.png`)).status, 200);
-  ok('launcher: lista blokad z serwera; wybór peleryny z kluczem zaproszenia przechodzi');
+  ok('launcher: wybór peleryny z kluczem zaproszenia przechodzi');
 
   // unieważnienie po stronie serwera blokuje launcher po następnym sprawdzeniu
   srv2.cli('revoke-invite', ola.id);

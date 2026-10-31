@@ -73,6 +73,6 @@ if (!/^https:\/\//.test(server) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(se
 
   const url = `${server}/admin?ticket=${encodeURIComponent(ticket)}`;
   if (process.platform === 'win32') spawnSync('cmd', ['/c', 'start', '""', url.replace(/&/g, '^&')], { stdio: 'ignore' });
-  else spawnSync(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], { stdio: 'ignore' });
+  else spawnSync('open', [url], { stdio: 'ignore' });
   console.log(`✓ Otwieram panel: ${server}/admin  (bilet jednorazowy, ważny 60 s)`);
 })().catch((e) => fail(e.message));

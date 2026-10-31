@@ -22,7 +22,7 @@ const check = (ok, what, extra = '') => {
   check((health.headers.get('strict-transport-security') || '').includes('max-age=31536000'), 'nagłówek HSTS (max-age=31536000)');
 
   // bramki: bez klucza nic prywatnego
-  for (const p of ['/updates/latest.yml', '/v1/announcements', '/blocklist.json', '/v1/invite', '/v1/admin/invites', '/v1/event/igrzyska/info']) {
+  for (const p of ['/updates/latest.yml', '/v1/announcements', '/v1/invite', '/v1/admin/invites', '/v1/event/igrzyska/info']) {
     check((await status(p)) === 401, `bez klucza ${p} → 401`);
   }
   check((await fetch(`${base}/v1/capes/test`, { method: 'PUT', body: 'x' })).status === 401, 'bez klucza PUT /v1/capes/<nick> → 401');

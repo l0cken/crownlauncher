@@ -7,7 +7,7 @@ const path = require('path');
 const root = path.join(__dirname, '..', '..');
 const CF = process.env.CROWN_BACKEND === 'cf';
 
-/** Dokumenty stanu serwera (invites.json, blocklist.json…): plik w DATA_DIR (Node) albo API admina Workera (cf). */
+/** Dokumenty stanu serwera (invites.json, announcements.json…): plik w DATA_DIR (Node) albo API admina Workera (cf). */
 function docs(dataDir, base) {
   // dokumenty wydarzeń: „event:<id>” = events/<id>/event.json (Node) albo dokument event:<id> (Worker)
   const fileOf = (name) => (name.startsWith('event:') ? path.join(dataDir, 'events', name.slice(6), 'event.json') : path.join(dataDir, name));

@@ -68,7 +68,7 @@ async function prepare(instance, onProgress = () => {}) {
   const vanilla = await mojang.getVanillaJson(instance.mcVersion);
   const component = vanilla.javaVersion?.component || 'java-runtime-delta';
 
-  // własna Java (instancja albo ustawienia) zastępuje runtime Mojanga - bez niej Linux na ARM, gdzie Mojang nie ma runtime'u, nie ruszy
+  // własna Java (instancja albo ustawienia) zastępuje runtime Mojanga - nie pobieramy wtedy niepotrzebnie runtime'u
   const customJava = String(instance.javaPath || config.get().javaPath || '').trim();
   const javaExe = customJava && (await exists(customJava)) ? customJava : await ensureJava(component, (p) => onProgress(p));
   const versionId = await ensureLoader(instance, javaExe, (p) => onProgress(p));

@@ -95,8 +95,7 @@ Launcher Minecrafta w stylu starego Feather Clienta, zintegrowany z [Modrinth](h
     serwera („…chwilowo ogranicza liczbę zapytań — spróbuj za minutę”), a nie samo „HTTP 429”.
   - **JVM**: dostrojony garbage collector G1 i flagi zamiast domyślnych (krótsze pauzy, mniej zacięć); na Javie 25
     (Minecraft 26.x) dodatkowo zwarte nagłówki obiektów (`-XX:+UseCompactObjectHeaders`: mniej pamięci).
-    Nie jest dokładany, gdy gracz sam wybrał GC w argumentach JVM.- **Ochrona przed cheatami** (patrz „Ochrona przed cheatami” niżej): blokada znanych klientów jako modów,
-  utwardzony JVM (brak agentów i „attach”) oraz nadzór nad bibliotekami wstrzykniętymi do gry.
+    Nie jest dokładany, gdy gracz sam wybrał GC w argumentach JVM.
 - **Newsy** na ekranie startowym to ogłoszenia launchera publikowane kluczem dostępu (patrz „Ogłoszenia” niżej);
   bez ogłoszeń i bez uprawnień do publikowania sekcja jest ukryta, a błąd pobierania jest pokazywany każdemu.
 - **Peleryny CrownClient**: 6 wbudowanych projektów (Korona, Złoto, Północ, Karmazyn, Szmaragd, Królewska) i własne
@@ -127,52 +126,7 @@ npm install
 npm start
 ```
 
-Dane (instancje, biblioteki, zasoby, Java) trafiają do `%APPDATA%\CrownLauncher` (Linux: `~/.config/CrownLauncher`).
-
-## Linux (od 0.1.40)
-
-Launcher działa też na Linuksie (x86_64; ARM — patrz niżej) jako plik **AppImage**: pobierasz go ze strony launchera
-(przycisk „Pobierz dla Linuksa”), `chmod +x CrownLauncher-<wersja>.AppImage` i uruchamiasz. Aktualizuje się sam (electron-updater
-podmienia plik AppImage; wersja wypakowana z archiwum aktualizuje się tylko ręcznie). Gra i Java (runtime Mojanga `linux`) pobierają
-się tak samo jak w Windowsie.
-
-- **Dane i sekrety.** Dane leżą w `~/.config/CrownLauncher`. Klucz zaproszenia, identyfikator komputera i tokeny są szyfrowane przez
-  `safeStorage`: z pękiem kluczy (gnome-keyring / KWallet) — nim, bez niego (np. samodzielny i3/sway) — zapasowym magazynem Electrona
-  (klucz wbudowany w Electrona: config.json nie ma czytelnych tokenów, ale to zaciemnienie, nie ochrona przed programem tego samego
-  użytkownika — DPAPI w Windows też jej nie daje). Rodzaj magazynu zwraca kanał `app:info` (`secretStore`).
-- **Java na ARM.** Mojang buduje runtime Javy tylko dla x64/x86. Na Linuksie ARM zainstaluj JDK 21 (dla Minecrafta 26.x JDK 25)
-  i wskaż plik `java` w *Ustawienia → Własna Java* (albo w ustawieniach instancji) — własna Java zastępuje pobieranie runtime'u.
-- **Ochrona przed cheatami na Linuksie** (inna niż w Windowsie, bo nie ma DACL procesu ani podpisów bibliotek):
-  gra dostaje środowisko bez `LD_PRELOAD`/`LD_AUDIT` (klasyczne wstrzyknięcie bez uchwytu) i bez śladów AppImage (`APPDIR`,
-  wpisy w `PATH`/`LD_LIBRARY_PATH`); nadzór czyta `/proc/<pid>/maps` co sekundę i ocenia każdy plik zmapowany jako kod: biblioteki
-  z katalogów systemowych (`/usr`, `/lib*`, `/opt`, `/nix/store`, `/run/opengl-driver`, Flatpak, Snap), runtime Javy i natywne
-  biblioteki instancji są zaufane; znane natywne biblioteki w `/tmp` (LWJGL, JNA, Netty, sqlite, imgui-java, Simple Voice Chat) też;
-  **nieznana biblioteka z katalogu użytkownika albo spoza tych miejsc zamyka grę**, a obcy plik w `/tmp`, `/dev/shm` albo kod z
-  `memfd` tylko ostrzega. Dostępu do pamięci gry z zewnątrz (ptrace, `/proc/<pid>/mem`) pilnuje jądro (Yama): przy
-  `kernel.yama.ptrace_scope=0` launcher ostrzega w konsoli gry (`sudo sysctl kernel.yama.ptrace_scope=1`). **Uczciwie:** to słabsza
-  ochrona niż w Windowsie — injector z uprawnieniami roota albo działający przy `ptrace_scope=0` ją omija.
-- **Wydarzenie (IGRZYSKA ŚMIERCI).** Foldery instancji wydarzenia zamyka `chmod` (poza grą: `000`; w trakcie gry `mods` i `resourcepacks`
-  tylko do odczytu), nie ukrywanie atrybutami jak w Windowsie — właściciel cofnie to jednym `chmod`, tak jak w Windowsie przez
-  właściwości folderu. Reszta (kod wydarzenia, bramka serwera) działa bez zmian.
-- **Nakładki.** Podobnie jak w Windowsie, nakładki wstrzykiwane do gry (np. Steam overlay przez `LD_PRELOAD`, MangoHud) nie
-  załadują się — nagrywaj okno lub ekran.
-- **Wygląd.** Okno bez ramki z własnymi przyciskami; ikona z `assets/logo-512.png`. AppImage uruchamia się z `--no-sandbox` tylko wtedy,
-  gdy system nie pozwala na przestrzenie nazw użytkownika (sprawdza to skrypt AppRun, np. Ubuntu 24.04 z domyślnym AppArmor).
-
-Budowanie (**nie działa w Windowsie** — electron-builder składa AppImage tylko na Linuksie; użyj Linuksa, WSL, Dockera albo CI):
-
-```bash
-bash scripts/build-linux.sh --smoke           # na Linuksie, w rozpakowanym źródle: npm ci, testy Linuksa, build, kontrola pliku, start na 15 s
-# (ręcznie: npm ci; CROWN_OUT_DIR=release npm run dist:linux)  → release/CrownLauncher-<wersja>.AppImage + latest-linux.yml
-```
-
-Gotowe pliki skopiuj do `release/` projektu na Windowsie i tam: `npm.cmd run release -- --linux --skip-build` (wgrywa je na serwer,
-ta sama wersja co wydanie Windows). Skrypt `scripts/build-linux.sh` jest samowystarczalny (potrzebuje Node 22+/npm i internetu) i na
-prawdziwym Linuksie uruchamia też `dev-tests/linux-real-test.js`: prawdziwy `/proc/<pid>/maps`, proces z biblioteką załadowaną przez
-`dlopen` (nadzór ma ją wykryć), chmod folderów wydarzenia i środowisko procesu potomnego — to jedyny test, który sprawdza Linuksa naprawdę.
-
-Serwer (Worker i `server/server.js`) trzyma `latest-linux.yml` i plik `.AppImage` obok `latest.yml` i instalatora; strona pobierania
-ma dwa przyciski (Windows / Linux). Dopóki nie wgrasz AppImage, przycisk Linuksa mówi, że wersji jeszcze nie ma.
+Dane (instancje, biblioteki, zasoby, Java) trafiają do `%APPDATA%\CrownLauncher`. Launcher działa tylko w Windowsie.
 
 ## Eksport instancji (od 0.1.40)
 
@@ -310,65 +264,6 @@ Token z uprawnieniem zapisu **nie może** siedzieć w launcherze (każdy mógłb
    godzinę z jednego adresu IP, maks. 5000 peleryn.
 5. Serwer widzi nicki graczy i adresy IP (jak każdy serwer WWW) oraz peleryny; nie dostaje haseł ani tokenów
    logowania do gry poza jednorazową weryfikacją tokena Minecrafta.
-## Ochrona przed cheatami
-
-> **Uczciwie o granicach:** to warstwa po stronie launchera. Zatrzymuje typowe sposoby (hakowany klient wgrany
-> jako mod, agenty Javy, dopisane argumenty JVM, wstrzyknięcie DLL w trakcie gry), ale **nie zastępuje antycheata
-> na serwerze**. Kto zmodyfikuje sam launcher albo uruchomi grę poza nim, tych zabezpieczeń nie ma — jedynym
-> miejscem, któremu można w pełni ufać, jest serwer (np. Grim, Vulcan, Matrix). Nie wykrywamy też paczek zasobów
-> typu X-Ray ani cheatów działających poza procesem gry.
-
-Co robi launcher:
-
-1. **Mody.** Przed każdym uruchomieniem skanuje `mods/` (także podkatalogi wersji i jary w jarach) i **nie
-   uruchomi gry**, dopóki w instancji jest znany cheat. Sprawdza identyfikator i nazwę moda, nazwę pliku, sumę
-   SHA-1 oraz klasy o nazwach typowych dla cheatów (KillAura, Aimbot…). Te same reguły działają przy instalacji
-   z Modrinth i przy imporcie `.mrpack` (paczka z cheatem w ogóle nie powstaje).
-2. **Argumenty JVM.** Z pól „argumenty JVM” usuwane są `-javaagent`, `-agentlib/-agentpath`, `-Xbootclasspath`,
-   `-cp`, `-Djava.library.path`, `-Dfabric.addMods` i podobne, a zmienne `JAVA_TOOL_OPTIONS`,
-   `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS` nie są przekazywane do gry. Gra startuje z
-   `-XX:+DisableAttachMechanism` i `-XX:-EnableDynamicAgentLoading`, więc zewnętrzne narzędzia Javy nie podepną
-   się do działającego procesu.
-3. **Zamknięty dostęp do procesu gry — blokada wstrzykiwania (Windows, od 0.1.38).** Każdy injector (cheat, nakładka,
-   debugger, edytor pamięci) zaczyna od otwarcia procesu gry z prawem do tworzenia wątków, zapisu pamięci albo
-   duplikowania uchwytów. Zaraz po starcie (~0,5 s) proces gry dostaje taką listę praw dostępu (DACL), która **nie
-   daje tych praw nikomu** — także temu samemu użytkownikowi i administratorowi — i której nie da się potem zmienić
-   (odebrane też `WRITE_DAC`). Zostaje odczyt, zapytanie o proces i zamknięcie, więc Menedżer zadań i nadzór launchera
-   działają. Blokada nie zależy od tego, jaki to program ani co wstrzykuje, więc dotyczy też nakładek (OBS „Przechwytywanie
-   gry”, Medal, Discord overlay) — nagrywaj okno lub ekran. **Natywny start:** na Windows gra startuje przez malutkiego
-   pomocnika (`src/main/native/CrownSpawn.cs`, kompilowany wbudowanym `csc.exe` przy każdym starcie launchera, skrót
-   SHA-256 sprawdzany przed każdą grą), który tworzy proces **od razu** z tą listą praw (bez wyścigu po starcie) i z mitygacją
-   „extension point disable” (globalne haki okien, AppInit_DLLs). Gdy pomocnika nie da się użyć, gra startuje zwykłym
-   `spawn` i blokada wchodzi ~0,5 s później. **Granice:** program z przywilejem debugowania (injector „uruchom jako
-   administrator”, sterownik jądra) omija każdą taką listę; **hak okna celowany w wątek gry** (`SetWindowsHookEx` z
-   identyfikatorem wątku) nie potrzebuje uchwytu do procesu i nie jest blokowany (sprawdzone) — łapie go punkt 4.
-   Testy: `node dev-tests/inject-block-test.js`, `node dev-tests/native-spawn-test.js`.
-4. **Wstrzyknięte biblioteki (Windows).** Pierwszy przegląd 15 s po starcie ocenia **wszystkie** biblioteki w grze.
-   Potem pomocnik natywnego startu (ma pełny uchwyt do gry, więc widzi biblioteki mimo blokady) wylicza je co 0,5 s
-   i **nowa biblioteka wywołuje pełną ocenę od razu** (ścieżka + podpis); pełny przegląd odbywa się też co 20 s (przy
-   starcie zapasowym tylko to). **Niepodpisana** biblioteka spoza katalogów systemowych, Javy i natywnych bibliotek
-   instancji **zamyka grę** (ProgramData i cały folder launchera nie są już zaufane — użytkownik może tam pisać); taka
-   sama w folderze tymczasowym tylko ostrzega (tam Java rozpakowuje własne biblioteki natywne). Biblioteki z ważnym
-   podpisem przechodzą; gdyby legalna biblioteka została zamknięta przez pomyłkę, dopisz jej nazwę do `allowModules`.
-
-### Własna lista: `blocklist.json`
-
-Reguły można uzupełniać bez wydawania nowej wersji launchera — wrzuć plik `blocklist.json` do głównego katalogu
-repozytorium z `GITHUB_REPO` (launcher pobiera go przy uruchomieniu gry, cache 6 h; brak sieci nie blokuje gry):
-
-```json
-{
-  "modIds": ["id-cheata"],
-  "namePatterns": ["nazwa[-_ ]klienta"],
-  "markers": ["nazwaklasy"],
-  "sha1": ["suma-sha1-pliku"],
-  "allowIds": ["freecam"],
-  "allowSha1": ["suma-sha1-legalnego-pliku"],
-  "allowModules": ["legalna-biblioteka.dll"]
-}
-```
-
-`allow*` służą do usuwania fałszywych alarmów (pozycje wbudowane można w ten sposób wyłączyć).
 
 ## Ogłoszenia i aktualizacje przez GitHub (zalecane, bez serwera)
 
@@ -496,8 +391,7 @@ Gdy launcher ma nie być publicznie dostępny (ani na GitHubie, ani pod adresem 
    ```powershell
    Read-Host "Klucz admin" -AsSecureString | ConvertFrom-SecureString | Set-Content "$env:USERPROFILE\.crownlauncher-admin-key"
    ```
-6. **Lista blokad antycheata:** plik `blocklist.json` w `DATA_DIR` serwera (format jak w sekcji o antycheacie).
-7. **Wydarzenie (IGRZYSKA ŚMIERCI):** klucz z rodzajem „Kod: IGRZYSKA ŚMIERCI” (panel → Nowy klucz → Rodzaj klucza;
+6. **Wydarzenie (IGRZYSKA ŚMIERCI):** klucz z rodzajem „Kod: IGRZYSKA ŚMIERCI” (panel → Nowy klucz → Rodzaj klucza;
    CLI `create-invite "Nazwa" --profile igrzyska`, `set-profile <id> igrzyska|-`) to **kod wydarzenia**. Jako jedyny
    klucz gracza daje launcher ograniczony do wydarzenia (zablokowane Instancje, Serwery, Skiny i Modrinth); gracz z
    pełnym dostępem wpisuje kod w zakładce IGRZYSKA ŚMIERCI i nic mu nie blokuje. W panelu (karta „Wydarzenie”) wgrywasz
@@ -533,8 +427,6 @@ najpierw wydanie przejściowe na GitHubie z adresem serwera w launcherze:
 npm run dist
 ```
 
-(Linux: AppImage — sekcja „Linux” wyżej, `npm run dist:linux` na Linuksie.)
-
 Wynik w katalogu `dist/` (przy `npm run release` — w `release/`). Instalator ma wbudowane wszystkie mody z
 `assets/mods`, więc po zmianie jarów uruchom najpierw `node scripts/sync-bundled-mods.js <katalog z jarami>`.
 
@@ -562,7 +454,6 @@ src/main/            proces główny Electrona
     java.js          runtime Javy od Mojang
     loaders.js       Fabric
     launch.js        budowa polecenia i uruchomienie procesu
-    native-spawn.js  natywny start gry (Windows): pomocnik CrownSpawn.cs z blokadą wstrzykiwania od pierwszej chwili
     export.js        eksport instancji do .mrpack (overrides/, bez logów i plików poufnych), zip-writer.js: strumieniowy zapis ZIP
     game.js          stan uruchomień, logi
     modrinth.js      API Modrinth, instalacja, .mrpack
@@ -576,7 +467,6 @@ src/main/            proces główny Electrona
     discord.js       Discord Rich Presence przez lokalny potok IPC (bez bibliotek)
     capes.js         biblioteka peleryn, wybór, CustomSkinLoader (konfiguracja tylko pod peleryny), nadawanie przez GitHub
     cape-art.js      wbudowane peleryny rysowane programowo + koder PNG
-    anticheat.js     skan modów, utwardzenie JVM, nadzór nad wstrzykniętymi bibliotekami
     performance-mods.js  Sodium, Lithium itd. dokładane do instancji Fabric
     skins.js         biblioteka skinów, odczyt oficjalnego skina i modelu + wykrywanie zmian, API peleryn konta, wyszukiwanie po nicku
     announcements.js klient ogłoszeń (GitHub / serwer): odczyt, logowanie kluczem, publikacja

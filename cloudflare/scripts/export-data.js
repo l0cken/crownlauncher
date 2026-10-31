@@ -1,4 +1,4 @@
-// Eksport danych Workera do układu katalogów VPS-a (data/): invites.json, keys.json, players.json, announcements.json, blocklist.json,
+// Eksport danych Workera do układu katalogów VPS-a (data/): invites.json, keys.json, players.json, announcements.json,
 // events/<id>/event.json + pliki, capes/<nick>.png (opcjonalnie updates/ z --with-updates). To droga POWROTU na VPS (patrz CUTOVER.md)
 // i część weryfikacji migracji. Skrypt tylko CZYTA z Workera i zapisuje do lokalnego katalogu.
 // Użycie: node cloudflare/scripts/export-data.js --out <katalog> [--target test | --base https://adres] [--with-updates]
@@ -14,10 +14,10 @@ const write = (file, data) => {
 
 async function exportData(client, out, { withUpdates = false, log = () => {} } = {}) {
   // dokumenty (tak samo zapisane jak na VPS-ie: JSON z wcięciem 2 spacje)
-  for (const name of ['invites.json', 'keys.json', 'players.json', 'announcements.json', 'blocklist.json']) {
+  for (const name of ['invites.json', 'keys.json', 'players.json', 'announcements.json']) {
     const value = await client.raw(name);
     if (value === null || value === undefined) continue;
-    write(path.join(out, name), typeof value === 'string' && name === 'blocklist.json' ? value : JSON.stringify(value, null, 2));
+    write(path.join(out, name), JSON.stringify(value, null, 2));
     log(`  ${name}`);
   }
   // wydarzenia

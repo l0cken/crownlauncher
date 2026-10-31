@@ -94,7 +94,7 @@ async function importAll(client, dir) {
   }
 
   // ---- dokumenty stanu; klucze OSTATNIE (po nich klucz bootstrap z sekretu przestaje działać, zostają klucze z VPS-a) ----
-  for (const name of ['players.json', 'announcements.json', 'blocklist.json', 'invites.json', 'keys.json']) {
+  for (const name of ['players.json', 'announcements.json', 'invites.json', 'keys.json']) {
     if (!have(name)) continue;
     await client.putRaw(name, readJson(path.join(dir, name)));
     console.log(`  ${name}`);
@@ -104,7 +104,7 @@ async function importAll(client, dir) {
 async function verify(client, dir) {
   const have = (p) => fs.existsSync(path.join(dir, p));
   console.log(`\nWeryfikacja na ${client.base} (klucz: ${client.label})`);
-  for (const name of ['invites.json', 'keys.json', 'players.json', 'announcements.json', 'blocklist.json']) {
+  for (const name of ['invites.json', 'keys.json', 'players.json', 'announcements.json']) {
     if (have(name)) check(canon(await client.raw(name)) === canon(readJson(path.join(dir, name))), `dokument ${name} identyczny z VPS-em`);
   }
   const eventsDir = path.join(dir, 'events');

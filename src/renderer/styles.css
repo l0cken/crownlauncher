@@ -824,7 +824,7 @@ input[type='range']::-webkit-slider-thumb {
   padding: 14px 16px;
   height: 440px;
   overflow: auto;
-  font-family: 'Cascadia Mono', Consolas, ui-monospace, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  font-family: 'Cascadia Mono', Consolas, ui-monospace, monospace;
   font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;

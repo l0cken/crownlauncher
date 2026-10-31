@@ -271,13 +271,12 @@ const ADMIN = process.env.SMOKE_ADMIN_KEY || `crown_${crypto.randomBytes(24).toS
     assert.strictEqual((await fetch(`${base}/capes/ola.png`)).status, 404, 'wyłączenie dostępu zdejmuje pelerynę');
     ok('peleryny: 403 bez dostępu, PNG w R2, publiczny odczyt i lista koron, zdjęcie peleryny po odebraniu dostępu');
 
-    // ---- ogłoszenia i blocklista ----
+    // ---- ogłoszenia ----
     r = await json('POST', '/v1/announcements', { title: 'Test', text: 'Treść' });
     assert.strictEqual(r.status, 201);
     r = await fetch(`${base}/v1/announcements`, { headers: { 'X-Crown-Invite': ola.key, 'X-Crown-Device': D1 } });
     assert.strictEqual((await r.json()).announcements[0].title, 'Test');
-    assert.strictEqual((await fetch(`${base}/blocklist.json`)).status, 401);
-    ok('ogłoszenia (zapis admina, odczyt kluczem) i blocklist.json za bramką');
+    ok('ogłoszenia (zapis admina, odczyt kluczem)');
 
     console.log(`\nWSZYSTKO OK (${n})`);
   } catch (e) {

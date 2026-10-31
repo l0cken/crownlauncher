@@ -58,15 +58,8 @@ const write = (file, data) => {
   assert.strictEqual(back.getEntry('pusty.txt').getData().length, 0);
   ok(`ZipWriter: ${sizes.length} plików (0 B … 1 MB), nazwy UTF-8, pusty wpis, duplikat i „..” odrzucone`);
 
-  // Windows: systemowy bsdtar (System32\tar.exe czyta ZIP-y); GNU tar z Git Bash bierze „C:” za nazwę zdalnego hosta
-  // Linux: GNU tar nie czyta ZIP-ów - bierzemy `unzip` albo `bsdtar`
-  const EXTRACTORS =
-    process.platform === 'win32'
-      ? [{ cmd: path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'), probe: ['--version'], args: (z, d) => ['-xf', z, '-C', d] }]
-      : [
-          { cmd: 'unzip', probe: ['-v'], args: (z, d) => ['-q', '-o', z, '-d', d] },
-          { cmd: 'bsdtar', probe: ['--version'], args: (z, d) => ['-xf', z, '-C', d] },
-        ];
+  // systemowy bsdtar (System32\tar.exe czyta ZIP-y); GNU tar z Git Bash bierze „C:” za nazwę zdalnego hosta
+  const EXTRACTORS = [{ cmd: path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'), probe: ['--version'], args: (z, d) => ['-xf', z, '-C', d] }];
   const extractor = EXTRACTORS.find((e) => {
     const p = spawnSync(e.cmd, e.probe);
     return !p.error && p.status === 0;

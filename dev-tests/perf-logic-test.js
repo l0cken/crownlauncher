@@ -154,14 +154,14 @@ const OPENGL = ['sodium', 'sodium-extra', 'iris', 'immediatelyfast'];
   const failing = await newInst('1.21.11');
   const oldInstall = modrinth.installContent;
   modrinth.installContent = async (opts) => {
-    if (opts.slug === 'gamma-utils') throw new Error('niedozwolony na tym launcherze (test)');
+    if (opts.slug === 'gamma-utils') throw new Error('nie udało się zainstalować (test)');
     return oldInstall(opts);
   };
   const resFail = await perf.optimize(failing.id);
   modrinth.installContent = oldInstall;
   assert.ok(resFail.failed.some((x) => x.title === 'gamma-utils'));
   assert.ok((await modsOf(failing)).includes('lithium'), 'reszta pakietu zainstalowana mimo błędu jednego moda');
-  ok('błąd jednego moda (np. zablokowany przez anticheat) jest zgłoszony, a reszta pakietu się instaluje');
+  ok('błąd instalacji jednego moda jest zgłoszony, a reszta pakietu się instaluje');
 
   // ---- ustawienie „zawsze Sodium” ----
   config.set({ renderer: 'sodium' });

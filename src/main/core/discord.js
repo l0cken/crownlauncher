@@ -1,4 +1,3 @@
-const fs = require('fs');
 const net = require('net');
 const path = require('path');
 const crypto = require('crypto');
@@ -33,14 +32,7 @@ function encode(op, data) {
 function defaultPipePath(i) {
   if (process.platform === 'win32') return `\\\\?\\pipe\\discord-ipc-${i}`;
   const base = process.env.XDG_RUNTIME_DIR || process.env.TMPDIR || process.env.TMP || process.env.TEMP || '/tmp';
-  const plain = path.join(base, `discord-ipc-${i}`);
-  if (process.platform !== 'linux') return plain;
-  // Discord z Flatpaka, Snapa i Vencord/Canary trzyma gniazdo w podkatalogu katalogu uruchomieniowego
-  for (const sub of ['', 'app/com.discordapp.Discord', 'app/com.discordapp.DiscordCanary', 'snap.discord', 'snap.discord-canary']) {
-    const candidate = path.join(base, sub, `discord-ipc-${i}`);
-    if (fs.existsSync(candidate)) return candidate;
-  }
-  return plain;
+  return path.join(base, `discord-ipc-${i}`);
 }
 
 /**

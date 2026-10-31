@@ -26,8 +26,6 @@ assert.ok(p.segments.some((s) => s.c === 'src' && s.t.trim() === '(Minecraft)'))
 p = parseLogLine('[CrownLauncher] Uruchamianie Granie (26.2, fabric)');
 assert.ok(p.sys && has(p.segments, 'tag') && has(p.segments, 'sysmsg'));
 assert.strictEqual(cls('[CrownLauncher] x'), 'ln sys');
-p = parseLogLine('[CrownLauncher] ANTYCHEAT: wykryto wstrzyknięte biblioteki (x.dll) - zamykam grę.');
-assert.ok(has(p.segments, 'msg') && p.segments.some((s) => /ERROR/.test(s.c || '')), 'komunikat antycheata jako błąd');
 
 // ślady stosu dziedziczą poziom
 const err = parseLogLine('[08:22:42] [Render thread/ERROR]: Failed to load config');

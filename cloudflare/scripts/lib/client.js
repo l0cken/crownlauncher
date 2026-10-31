@@ -158,7 +158,7 @@ function pullVps(ssh, remoteDir, dest, log = console.log) {
     if (r.status !== 0) throw new Error(`scp ${remote}: ${r.stderr}`);
   };
   const listing = run(`cd ${remoteDir} && ls -1p`).split('\n').filter(Boolean);
-  for (const f of ['invites.json', 'keys.json', 'players.json', 'announcements.json', 'blocklist.json']) {
+  for (const f of ['invites.json', 'keys.json', 'players.json', 'announcements.json']) {
     if (listing.includes(f)) scp(`${remoteDir}/${f}`, path.join(dest, f));
   }
   for (const d of ['events', 'capes']) if (listing.includes(`${d}/`)) scp(`${remoteDir}/${d}`, path.join(dest, d));

@@ -425,7 +425,6 @@ function wireEvents() {
     }
   });
   on('instance:error', ({ message }) => toast(message, 'err'));
-  on('anticheat:alert', ({ message }) => toast(message, 'err'));
   // klucz zaproszenia unieważniony albo wygasł: wracamy do ekranu z kluczem (trwająca gra działa dalej)
   // powrót do okna launchera: od razu sprawdzamy klucz (odłączenie komputera w panelu widać natychmiast, bez czekania na nadzór)
   window.addEventListener('focus', () => {

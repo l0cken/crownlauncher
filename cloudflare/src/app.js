@@ -52,9 +52,7 @@ const EVENT_KINDS = {
 };
 const EVENT_KIND_RE = Object.keys(EVENT_KINDS).join('|');
 
-const UPDATE_FILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(exe|AppImage|blockmap|yml)$/;
-// wersje launchera do pobrania: plik wskazany w latest.yml (Windows, instalator .exe) albo latest-linux.yml (Linux, AppImage)
-const INSTALLER_KINDS = { windows: { yml: 'latest.yml', ext: '.exe' }, linux: { yml: 'latest-linux.yml', ext: '.AppImage' } };
+const UPDATE_FILE_RE = /^(?:[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(?:exe|blockmap)|latest\.yml)$/;
 const MAX_UPDATE_BYTES = 400 * MB;
 const MAX_PART_BYTES = 64 * MB;
 // aktualizacje różnicowe (Range z wieloma zakresami): do 1000 zakresów w żądaniu, a odczytów z R2 najwyżej MAX_WINDOWS na odpowiedź
@@ -766,10 +764,9 @@ export function createApp({ kv, bucket, env }) {
   }
 
   // ---- aktualizacje launchera (electron-updater, provider "generic") w R2 -----------------
-  /** Nazwa najnowszego instalatora (Windows: .exe z latest.yml; `kind: 'linux'`: .AppImage z latest-linux.yml), albo '' gdy nic nie wgrano. */
-  async function latestInstaller(kind = 'windows') {
-    const { yml: ymlName, ext } = INSTALLER_KINDS[kind] || INSTALLER_KINDS.windows;
-    const obj = await bucket.get(`updates/${ymlName}`);
+  /** Nazwa najnowszego instalatora (.exe wskazany w latest.yml) albo '' gdy nic nie wgrano. */
+  async function latestInstaller() {
+    const obj = await bucket.get('updates/latest.yml');
     if (!obj) return '';
     const yml = await obj.text();
     const candidates = [
@@ -778,7 +775,7 @@ export function createApp({ kv, bucket, env }) {
     ];
     for (const c of candidates) {
       const name = String(c || '').trim().replace(/^['"]|['"]$/g, '');
-      if (UPDATE_FILE_RE.test(name) && name.endsWith(ext) && (await bucket.head(`updates/${name}`))) return name;
+      if (UPDATE_FILE_RE.test(name) && name.endsWith('.exe') && (await bucket.head(`updates/${name}`))) return name;
     }
     return '';
   }
@@ -1236,7 +1233,7 @@ export function createApp({ kv, bucket, env }) {
       return send(200, { ok: true }, { headers: { 'Set-Cookie': 'crown_panel=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' } });
     }
     if (route === 'GET /v1/admin/info') {
-      return send(200, { installer: (await latestInstaller()) || null, linuxInstaller: (await latestInstaller('linux')) || null, inviteOnly: INVITE_ONLY, name: admin.name });
+      return send(200, { installer: (await latestInstaller()) || null, inviteOnly: INVITE_ONLY, name: admin.name });
     }
     if (route === 'GET /v1/admin/invites') {
       const list = loadInvites().map(publicInvite).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -1357,7 +1354,7 @@ export function createApp({ kv, bucket, env }) {
       } catch {
         /* niepoprawne kodowanie */
       }
-      if (!/^(?:(?:invites|keys|players|announcements|gate)\.json|blocklist\.json|event:[a-z0-9-]{1,32})$/.test(name)) return send(400, { error: 'Nieznany dokument.' });
+      if (!/^(?:(?:invites|keys|players|announcements|gate)\.json|event:[a-z0-9-]{1,32})$/.test(name)) return send(400, { error: 'Nieznany dokument.' });
       if (raw[1] === 'GET') return send(200, { value: readJson(name, null) });
       const body = JSON.parse((await readLimited(req.raw, 8 * MB)).toString('utf8') || '{}');
       if (!('value' in body)) return send(400, { error: 'Brak pola „value”.' });
@@ -1515,16 +1512,6 @@ export function createApp({ kv, bucket, env }) {
       const installer = await latestInstaller();
       if (!installer) return sendHtml(404, downloadPage('Instalator nie został jeszcze opublikowany.'));
       return serveUpdate(req, installer, { attachment: true });
-    }
-
-    // lista blokad antycheata (zamiast blocklist.json z GitHuba): dokument „blocklist.json” w storage
-    if (route === 'GET /blocklist.json') {
-      if (!invited(req)) return denyInvite(ip, req);
-      const text = (() => {
-        const v = kv.get('blocklist.json');
-        return v === undefined ? '{}' : typeof v === 'string' ? v : JSON.stringify(v);
-      })();
-      return new Response(text, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' } });
     }
 
     // peleryny i lista graczy z koroną są publiczne (czyta je gra, bez klucza); limit na adres IP
